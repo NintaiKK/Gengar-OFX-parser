@@ -4,28 +4,25 @@ import pdfplumber
 from openpyxl import Workbook, load_workbook
 import ofxparse
 import os
+from datetime import datetime
 
 class ParserApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Conversor PDF/XLSX/OFX")
-        self.root.geometry("600x400")
+        self.root.geometry("650x450")
         
-        # Variáveis de controle
         self.pdf_path = tk.StringVar()
         self.xlsx_path = tk.StringVar()
         self.ofx_path = tk.StringVar()
+        self.modo_captura = tk.StringVar(value="Padrão")  # Novo: Variável para o modo de captura
         
-        # Criar interface
         self.create_widgets()
         
     def create_widgets(self):
-        # Frame principal
         main_frame = ttk.Frame(self.root, padding="20")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        
-        # Abas
         notebook = ttk.Notebook(main_frame)
         notebook.pack(fill=tk.BOTH, expand=True)
         
@@ -33,7 +30,6 @@ class ParserApp:
         tab_pdf_xlsx = ttk.Frame(notebook)
         notebook.add(tab_pdf_xlsx, text="PDF para XLSX")
         
-        # Widgets PDF para XLSX
         ttk.Label(tab_pdf_xlsx, text="Arquivo PDF:").grid(row=0, column=0, sticky=tk.W, pady=5)
         ttk.Entry(tab_pdf_xlsx, textvariable=self.pdf_path, width=50).grid(row=0, column=1, pady=5)
         ttk.Button(tab_pdf_xlsx, text="Procurar", command=self.browse_pdf).grid(row=0, column=2, pady=5)
@@ -54,14 +50,20 @@ class ParserApp:
         ttk.Entry(tab_xlsx_ofx, textvariable=self.xlsx_path, width=50).grid(row=0, column=1, pady=5)
         ttk.Button(tab_xlsx_ofx, text="Procurar", command=self.browse_xlsx).grid(row=0, column=2, pady=5)
         
-        ttk.Label(tab_xlsx_ofx, text="Arquivo OFX de saída:").grid(row=1, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(tab_xlsx_ofx, textvariable=self.ofx_path, width=50).grid(row=1, column=1, pady=5)
-        ttk.Button(tab_xlsx_ofx, text="Procurar", command=self.browse_ofx_output).grid(row=1, column=2, pady=5)
+        # Novo: Combobox para seleção do modo de captura
+        ttk.Label(tab_xlsx_ofx, text="Modo de Captura:").grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.cb_modo_captura = ttk.Combobox(tab_xlsx_ofx, textvariable=self.modo_captura, 
+                                          values=["Padrão", "Banco A", "Banco B", "Personalizado"])
+        self.cb_modo_captura.grid(row=1, column=1, pady=5, sticky=tk.W)
+        self.cb_modo_captura.current(0)
+        
+        ttk.Label(tab_xlsx_ofx, text="Arquivo OFX de saída:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(tab_xlsx_ofx, textvariable=self.ofx_path, width=50).grid(row=2, column=1, pady=5)
+        ttk.Button(tab_xlsx_ofx, text="Procurar", command=self.browse_ofx_output).grid(row=2, column=2, pady=5)
         
         ttk.Button(tab_xlsx_ofx, text="Converter XLSX para OFX", 
-                  command=self.convert_xlsx_to_ofx).grid(row=2, column=1, pady=20)
+                  command=self.convert_xlsx_to_ofx).grid(row=3, column=1, pady=20)
         
-        # Barra de status
         self.status = ttk.Label(main_frame, text="Pronto", relief=tk.SUNKEN)
         self.status.pack(fill=tk.X, pady=10)
     
@@ -69,7 +71,6 @@ class ParserApp:
         filename = filedialog.askopenfilename(filetypes=[("PDF Files", "*.pdf")])
         if filename:
             self.pdf_path.set(filename)
-            # Sugerir nome do arquivo XLSX
             base = os.path.splitext(filename)[0]
             self.xlsx_path.set(base + ".xlsx")
     
@@ -77,7 +78,6 @@ class ParserApp:
         filename = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xlsx")])
         if filename:
             self.xlsx_path.set(filename)
-            # Sugerir nome do arquivo OFX
             base = os.path.splitext(filename)[0]
             self.ofx_path.set(base + ".ofx")
     
@@ -105,21 +105,17 @@ class ParserApp:
             self.status.config(text="Convertendo PDF para XLSX...")
             self.root.update()
             
-            # Criar um novo workbook Excel
             wb = Workbook()
             ws = wb.active
             ws.title = "Dados do PDF"
             
-            # Extrair texto do PDF
             with pdfplumber.open(pdf_file) as pdf:
                 for page in pdf.pages:
                     text = page.extract_text()
                     if text:
                         for line in text.split('\n'):
-                            # Adicionar cada linha como uma linha no Excel
                             ws.append([line])
             
-            # Salvar o arquivo Excel
             wb.save(xlsx_file)
             
             messagebox.showinfo("Sucesso", f"Arquivo convertido com sucesso para:\n{xlsx_file}")
@@ -142,15 +138,14 @@ class ParserApp:
             self.root.update()
             
             # Carregar o arquivo Excel
-            wb = load_workbook(xlsx_file)
+            wb = load_workbook(xlsx_file, read_only=True)
             ws = wb.active
             
-            # Criar um arquivo OFX básico
-            # NOTA: Esta é uma implementação simplificada. O formato OFX é complexo.
-            # Em uma aplicação real, você precisaria mapear os dados do Excel para
-            # a estrutura OFX adequada, incluindo cabeçalhos, contas, transações, etc.
+            # Obter a data atual no formato OFX
+            current_date = datetime.now().strftime("%Y%m%d")
             
-            ofx_content = """OFXHEADER:100
+            # Criar cabeçalho OFX
+            ofx_content = f"""OFXHEADER:100
 DATA:OFXSGML
 VERSION:102
 SECURITY:NONE
@@ -167,7 +162,7 @@ NEWFILEUID:NONE
                 <CODE>0
                 <SEVERITY>INFO
             </STATUS>
-            <DTSERVER>20230514
+            <DTSERVER>{current_date}
             <LANGUAGE>POR
         </SONRS>
     </SIGNONMSGSRSV1>
@@ -186,35 +181,74 @@ NEWFILEUID:NONE
                     <ACCTTYPE>CHECKING
                 </BANKACCTFROM>
                 <BANKTRANLIST>
-                    <DTSTART>20230501
-                    <DTEND>20230514
+                    <DTSTART>{current_date}
+                    <DTEND>{current_date}
 """
             
-            # Adicionar transações (simplificado)
-            for row in ws.iter_rows(values_only=True):
-                if row and row[0]:  # Se a célula não estiver vazia
-                    # Aqui você precisaria mapear os dados do Excel para o formato OFX
-                    # Esta é uma implementação muito básica
-                    ofx_content += f"                    <STMTTRN>\n"
-                    ofx_content += f"                        <TRNTYPE>DEBIT\n"
-                    ofx_content += f"                        <DTPOSTED>20230514\n"
-                    ofx_content += f"                        <TRNAMT>-100.00\n"
-                    ofx_content += f"                        <FITID>123456789\n"
-                    ofx_content += f"                        <MEMO>{row[0]}\n"
-                    ofx_content += f"                    </STMTTRN>\n"
+            # Processar linhas do Excel de acordo com o modo selecionado
+            transactions = []
+            modo = self.modo_captura.get()
             
-            ofx_content += """                </BANKTRANLIST>
+            for row_idx, row in enumerate(ws.iter_rows(values_only=True), 1):
+                if not row or not any(row):
+                    continue
+                
+                try:
+                    # Diferentes modos de captura
+                    if modo == "Padrão":
+                        # Modo padrão: colunas Data, Descrição, Valor
+                        trans_date = row[0].strftime("%Y%m%d") if hasattr(row[0], 'strftime') else current_date
+                        description = str(row[1]) if len(row) > 1 else "Transação"
+                        amount = float(row[2]) if len(row) > 2 and row[2] is not None else 0.0
+                    
+                    elif modo == "Banco A":
+                        # Modo para Banco A: colunas Valor, Data, Histórico
+                        amount = float(row[0]) if row[0] is not None else 0.0
+                        trans_date = row[1].strftime("%Y%m%d") if hasattr(row[1], 'strftime') else current_date
+                        description = str(row[2]) if len(row) > 2 else "Transação"
+                    
+                    elif modo == "Banco B":
+                        # Modo para Banco B: colunas Data, Valor, Tipo, Descrição
+                        trans_date = row[0].strftime("%Y%m%d") if hasattr(row[0], 'strftime') else current_date
+                        amount = float(row[1]) if row[1] is not None else 0.0
+                        trans_type = "CREDIT" if str(row[2]).upper() in ["C", "CREDITO", "CRÉDITO"] else "DEBIT"
+                        description = str(row[3]) if len(row) > 3 else "Transação"
+                    
+                    elif modo == "Personalizado":
+                        # Modo personalizado: captura todas as colunas como MEMO
+                        trans_date = current_date
+                        amount = 0.0
+                        description = " | ".join([str(cell) if cell is not None else "" for cell in row])
+                    
+                    transaction = f"""                    <STMTTRN>
+                        <TRNTYPE>{"DEBIT" if amount < 0 else "CREDIT"}
+                        <DTPOSTED>{trans_date}
+                        <TRNAMT>{amount:.2f}
+                        <FITID>{row_idx}
+                        <MEMO>{description}
+                    </STMTTRN>
+"""
+                    transactions.append(transaction)
+                except (ValueError, IndexError, AttributeError) as e:
+                    print(f"Erro ao processar linha {row_idx} no modo {modo}: {e}")
+                    continue
+            
+            # Juntar todas as transações
+            ofx_content += "".join(transactions)
+            
+            # Rodapé OFX
+            ofx_content += f"""                </BANKTRANLIST>
                 <LEDGERBAL>
-                    <BALAMT>1000.00
-                    <DTASOF>20230514
+                    <BALAMT>0.00
+                    <DTASOF>{current_date}
                 </LEDGERBAL>
             </STMTRS>
         </STMTTRNRS>
     </BANKMSGSRSV1>
 </OFX>"""
             
-            # Salvar o arquivo OFX
-            with open(ofx_file, 'w') as f:
+            # Escrever o arquivo OFX
+            with open(ofx_file, 'w', encoding='utf-8') as f:
                 f.write(ofx_content)
             
             messagebox.showinfo("Sucesso", f"Arquivo convertido com sucesso para:\n{ofx_file}")
